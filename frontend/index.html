@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Photo Search</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <header>
+    <h1>AI Photo Search</h1>
+  </header>
+
+  <section id="search-section">
+    <input type="text" id="search-input" placeholder="Search for photos…" />
+    <button id="search-btn">Search</button>
+  </section>
+
+  <section id="results-section">
+    <h2>Results</h2>
+    <div id="results"></div>
+  </section>
+
+  <section id="upload-section">
+    <h2>Upload Photo</h2>
+    <input type="file" id="file-input" accept="image/*" /><br/>
+    <input type="text" id="labels-input" placeholder="Custom labels, comma-separated" /><br/>
+    <input type="text" id="key-input" placeholder="Filename (e.g. dog.jpg)" /><br/>
+    <button id="upload-btn">Upload</button>
+    <div id="upload-status"></div>
+  </section>
+
+<!-- HTTP client -->
+  <script src="sdk/lib/axios/dist/axios.standalone.js"></script>
+<!-- CryptoJS for SigV4 signing -->
+  <script src="sdk/lib/CryptoJS/rollups/hmac-sha256.js"></script>
+  <script src="sdk/lib/CryptoJS/rollups/sha256.js"></script> 
+  <script src="sdk/lib/CryptoJS/components/hmac.js"></script>
+  <script src="sdk/lib/CryptoJS/components/enc-base64.js"></script>
+<!-- URL templating -->
+  <script src="sdk/lib/url-template/url-template.js"></script>
+<!-- API Gateway core -->
+  <script src="sdk/lib/apiGatewayCore/sigV4Client.js"></script>
+  <script src="sdk/lib/apiGatewayCore/apiGatewayClient.js"></script>
+  <script src="sdk/lib/apiGatewayCore/simpleHttpClient.js"></script>
+  <script src="sdk/lib/apiGatewayCore/utils.js"></script>
+<!-- The generated client -->
+  <script src="sdk/apigClient.js"></script>
+<!-- Your application logic -->
+  <script src="script.js"></script>
+
+
+  <script src="script.js"></script>
+</body>
+</html>
