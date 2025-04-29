@@ -1,0 +1,14 @@
+# buildspec.yml at repo root
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - echo "Building frontend application"
+      - mkdir frontend-build
+      - cp -r frontend/* frontend-build/
+
+artifacts:
+  base-directory: frontend-build
+  files:
+    - '**/*'
