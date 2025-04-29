@@ -1,8 +1,10 @@
 // Initialize the API Gateway client
 // If you require an API key, pass `{ apiKey: 'YOUR_API_KEY' }` as the second argument.
 const apigClient = apigClientFactory.newClient({
-    invokeUrl: 'https://pj93ofe9m6.execute-api.us-east-1.amazonaws.com/prod'
-  });
+    invokeUrl: 'https://pj93ofe9m6.execute-api.us-east-1.amazonaws.com/photos_v2',
+    defaultContentType: '',
+    defaultAcceptType: 'application/json' 
+});
   
   //
   // Search
@@ -64,15 +66,27 @@ const apigClient = apigClientFactory.newClient({
     }
   
     const file = fileInput.files[0];
+
+    console.log(file)
+    console.log(file.type)
+
     try {
       // apigClient.uploadPut(params, body, additionalParams)
-      const params = { object: key };
-      const additionalParams = {
+      const params_old = { object: key };
+      const additionalParams_old = {
         headers: {
-          'Content-Type': file.type,
+          'Content-Type': file.type || 'application/octet-stream',
           'x-amz-meta-customLabels': labelsInput
         }
       };
+
+      const params = {
+        object: key,
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-amz-meta-customLabels': labelsInput
+      };
+      const additionalParams = {};
+
   
       // The SDK will handle sending the binary body
       await apigClient.uploadPut(params, file, additionalParams);

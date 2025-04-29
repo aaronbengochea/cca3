@@ -7,9 +7,9 @@ import requests
 # Initialize AWS clients and configuration
 lex_client = boto3.client('lexv2-runtime')
 
-ES_ENDPOINT = os.environ['ES_ENDPOINT']    # OpenSearch endpoint (no https://)
-ES_USER     = os.environ['ES_USER']        # HTTP auth username
-ES_PASS     = os.environ['ES_PASS']        # HTTP auth password
+ES_ENDPOINT = os.environ['ES_ENDPOINT']    
+ES_USER     = os.environ['ES_USER']        
+ES_PASS     = os.environ['ES_PASS']       
 ES_HEADERS  = {"Content-Type": "application/json"}
 
 LEX_BOT_ID       = os.environ['LEX_BOT_ID']
@@ -50,9 +50,9 @@ def lambda_handler(event, context):
     # 4) Query OpenSearch for matching labels
     es_url = f"https://{ES_ENDPOINT}/photos/_search"
     es_query = {
-        "query": {
-            "bool": {
-                "should": [ {"term": {"labels": kw}} for kw in keywords ]
+        'query': {
+            'terms': {
+                'labels': keywords
             }
         }
     }
