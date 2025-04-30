@@ -1,0 +1,38 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.13
+    commands:
+      - echo "Upgrading pip…"
+      - pip install --upgrade pip
+
+  pre_build:
+    commands:
+      - echo "Installing dependencies for both Lambdas from root requirements.txt…"
+      - pip install -r requirements.txt -t LF1/    # install all deps into LF1/
+      - pip install -r requirements.txt -t LF2/    # install all deps into LF2/
+
+  build:
+    commands:
+      - echo "Preparing build_output directory…"
+      - rm -rf build_output && mkdir build_output
+
+      # Package LF1
+      - echo "Packaging LF1 into index-photos.zip…"
+      - mkdir -p build_output/lf1
+      - cp -r LF1/* build_output/lf1/
+      - cd build_output/lf1 && zip -r ../../index-photos.zip . && cd ../..
+
+      # Package LF2
+      - echo "Packaging LF2 into search-photos.zip…"
+      - mkdir -p build_output/lf2
+      - cp -r LF2/* build_output/lf2/
+      - cd build_output/lf2 && zip -r ../../search-photos.zip . && cd ../..
+
+artifacts:
+  files:
+    - index-photos.zip
+    - search-photos.zip
+  discard-paths: yes
