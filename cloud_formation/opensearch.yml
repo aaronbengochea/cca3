@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to deploy OpenSearch domain
+
+Parameters:
+  OpenSearchUsername:
+    Type: String
+  OpenSearchPassword:
+    Type: String
+    NoEcho: true
+
+Resources:
+  # OpenSearch domain
+  PhotosDomain:
+    Type: AWS::OpenSearchService::Domain
+    Properties:
+      DomainName: photos
+      EngineVersion: OpenSearch_2.17
+      IPAddressType: dualstack
+      
+      # Cluster configurations
+      ClusterConfig:
+        InstanceType: t3.small.search
+        InstanceCount: 1
+      EBSOptions:
+        EBSEnabled: true
+        VolumeType: gp3
+        VolumeSize: 10
+        Iops: 3000
+        Throughput: 125
+      
+      # Security configurations
+      AdvancedSecurityOptions:
+        Enabled: true
+        InternalUserDatabaseEnabled: true
+        MasterUserOptions:
+          MasterUserName: !Ref OpenSearchUsername
+          MasterUserPassword: !Ref OpenSearchPassword
+      DomainEndpointOptions:
+        EnforceHTTPS: true
+      NodeToNodeEncryptionOptions:
+        Enabled: true
+      EncryptionAtRestOptions:
+        Enabled: true
+      AccessPolicies:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: es:*
+            Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/photos/*
+
+Outputs:
+  OpenSearchDomainEndpoint:
+    Description: OpenSearch domain endpoint (V2)
+    Value: !GetAtt PhotosDomain.DomainEndpointV2

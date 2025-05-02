@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to deploy Lambda stack
+
+Parameters:
+  OpenSearchUsername:
+    Type: String
+  OpenSearchPassword:
+    Type: String
+    NoEcho: true
+  ArtifactsBucketName:
+    Type: String
+    Default: cs-gy-9223-smart-photo-album-artifacts
+  LF1FunctionName:
+    Type: String
+    Default: LF1-index-photos
+  LF2FunctionName:
+    Type: String
+    Default: LF2-search-photos
+  LambdaRoleName:
+    Type: String
+    Default: smart-photo-album-lambda-role
+  Layer1Name:
+    Type: String
+    Default: requests
+  Layer2Name:
+    Type: String
+    Default: python-dotenv
+
+Resources:
+  # Lambda function (for indexing photos)
+  LF1Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref LF1FunctionName
+      Runtime: python3.13
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Handler: lambda.index_photos.lambda_handler
+      Timeout: 30
+      Code:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: lambdas/index_photos.zip
+      Layers:
+        - !Ref Layer1
+        - !Ref Layer2
+      Environment:
+        Variables:
+          OPENSEARCH_USERNAME: !Ref OpenSearchUsername
+          OPENSEARCH_PASSWORD: !Ref OpenSearchPassword
+
+  # Lambda function version
+  LF1Version:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref LF1Function
+
+  # Lambda function alias
+  LF1Alias:
+    Type: AWS::Lambda::Alias
+    Properties:
+      FunctionName: !Ref LF1Function
+      FunctionVersion: !GetAtt LF1Version.Version
+      Name: prod
+
+  # Lambda function (for searching photos)
+  LF2Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref LF2FunctionName
+      Runtime: python3.13
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Handler: lambda.search_photos.lambda_handler
+      Timeout: 30
+      Code:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: lambdas/search_photos.zip
+      Layers:
+        - !Ref Layer1
+        - !Ref Layer2
+      Environment:
+        Variables:
+          OPENSEARCH_USERNAME: !Ref OpenSearchUsername
+          OPENSEARCH_PASSWORD: !Ref OpenSearchPassword
+
+  # Lambda function version
+  LF2Version:
+    Type: AWS::Lambda::Version
+    Properties:
+      FunctionName: !Ref LF2Function
+  
+  # Lambda function alias
+  LF2Alias:
+    Type: AWS::Lambda::Alias
+    Properties:
+      FunctionName: !Ref LF2Function
+      FunctionVersion: !GetAtt LF2Version.Version
+      Name: prod
+
+  # IAM role for Lambda functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref LambdaRoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonRekognitionReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonOpenSearchServiceReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonLexRunBotsOnly
+        - arn:aws:iam::aws:policy/AmazonLexReadOnly
+  
+  # Layer for requests library
+  Layer1:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: !Ref Layer1Name
+      Description: Python requests library
+      Content:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: layers/requests.zip
+      CompatibleRuntimes:
+        - python3.13
+
+  # Layer for python-dotenv library
+  Layer2:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: !Ref Layer2Name
+      Description: Python dotenv library
+      Content:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: layers/python-dotenv.zip
+      CompatibleRuntimes:
+        - python3.13
+
+Outputs:
+  LF1Function:
+    Description: Lambda function for indexing photos
+    Value: !Ref LF1Function
+
+  LF2Function:
+    Description: Lambda function for searching photos
+    Value: !Ref LF2Function
+
+  LambdaExecutionRole:
+    Description: IAM role for both Lambda functions
+    Value: !Ref LambdaExecutionRole
+  
+  RequestsLayer:
+    Description: Requests layer
+    Value: !Ref Layer1
+  
+  DotenvLayer:
+    Description: Python-dotenv layer
+    Value: !Ref Layer2

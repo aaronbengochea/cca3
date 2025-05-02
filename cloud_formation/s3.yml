@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to deploy S3 buckets (frontend and storage)
+
+Parameters:
+  LF1FunctionName:
+    Type: String
+    Default: LF1-index-photos
+  FrontendBucketName:
+    Type: String
+    Default: cs-gy-9223-smart-photo-album
+  StorageBucketName:
+    Type: String
+    Default: cs-gy-9223-smart-photo-album-storage
+
+Resources:
+  # S3 bucket for hosting the frontend
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref FrontendBucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+  # Bucket policy to allow public read access to all objects
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub arn:aws:s3:::${FrontendBucketName}/*
+
+  # S3 bucket for storing uploaded photos
+  StorageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref StorageBucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:Put
+            Function: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LF1FunctionName}
+
+  # Bucket policy to allow public read access to all objects
+  StorageBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StorageBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub arn:aws:s3:::${StorageBucketName}/*
+
+  # Lambda permission for storage bucket (to invoke LF1-index-photos)
+  LF1Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LF1FunctionName
+      Action: lambda:InvokeFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub arn:aws:s3:::${StorageBucketName}
+
+Outputs:
+  FrontendBucketWebsiteURL:
+    Description: Hosted Frontend URL
+    Value: !Sub http://${FrontendBucketName}.s3-website-${AWS::Region}.amazonaws.com
+  
+  StorageBucketName:
+    Description: S3 Storage Bucket name
+    Value: !Ref StorageBucket

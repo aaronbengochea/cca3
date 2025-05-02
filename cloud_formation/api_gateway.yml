@@ -1,0 +1,230 @@
+# Configurations modeled bassed on exported API Gateway swagger file provided for assignment
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to deploy API Gateway stack
+
+Parameters:
+  UploadBucketName:
+    Type: String
+    Default: cs-gy-9223-smart-photo-album-storage
+  LF1FunctionName:
+    Type: String
+    Default: LF1-index-photos
+  LF2FunctionName:
+    Type: String
+    Default: LF2-search-photos
+  StageName:
+    Type: String
+    Default: prod
+  ApiName:
+    Type: String
+    Default: smart-photo-album-api
+  ApiKeyName:
+    Type: String
+    Default: smart-photo-album-api-key
+  UsagePlanName:
+    Type: String
+    Default: smart-photo-album-usage-plan
+  S3ProxyRoleName:
+    Type: String
+    Default: smart-photo-album-apigateway-s3-proxy-role
+
+Resources:
+  # API Gateway REST API
+  ApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Ref ApiName
+      BinaryMediaTypes:
+        - image/jpeg
+        - image/png
+        - application/octet-stream
+
+  # /search resource
+  SearchResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: search
+  
+  # GET /search method (Lambda proxy integration)
+  GetSearchMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref SearchResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LF2FunctionName}/invocations
+      MethodResponses:
+        - StatusCode: 200
+  
+  # OPTIONS /search method (CORS configurations)
+  OptionsSearchMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref SearchResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # /upload resource
+  UploadResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: upload
+  
+  # PUT /upload method (S3 proxy integration)
+  PutUploadMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref UploadResource
+      HttpMethod: PUT
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      RequestParameters:
+        method.request.querystring.object: true
+        method.request.header.x-amz-meta-customLabels: false
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: PUT
+        Credentials: !GetAtt S3ProxyExecutionRole.Arn
+        Uri: !Sub
+          arn:aws:apigateway:${AWS::Region}:s3:path/${UploadBucketName}/{object}
+        RequestParameters:
+          integration.request.path.object: method.request.querystring.object
+          integration.request.header.x-amz-meta-customLabels: method.request.header.x-amz-meta-customLabels
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+  
+  # OPTIONS /upload method (CORS configurations)
+  OptionsUploadMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref UploadResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Methods: "'PUT,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-amz-meta-customLabels'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # API Gateway deployment
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - GetSearchMethod
+      - OptionsSearchMethod
+      - PutUploadMethod
+      - OptionsUploadMethod
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: !Ref StageName
+
+  # API key
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: !Ref ApiKeyName
+      Enabled: true
+
+  # Usage plan
+  UsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    DependsOn: ApiGatewayDeployment
+    Properties:
+      UsagePlanName: !Ref UsagePlanName
+      ApiStages:
+        - ApiId: !Ref ApiGatewayRestApi
+          Stage: !Ref StageName
+      Throttle:
+        RateLimit: 1
+        BurstLimit: 1
+      Quota:
+        Limit: 1000
+        Period: MONTH
+
+  # Usage plan key (to link API key)
+  UsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref ApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref UsagePlan
+
+  # Lambda permission for GET /search (to invoke LF2-search-photos)
+  LF2Permission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LF2FunctionName
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/${StageName}/GET/search
+  
+  # IAM role (for S3 proxy integration)
+  S3ProxyExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref S3ProxyRoleName
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+# Outputs used in frontend/configs.js
+Outputs:
+  ApiUrl:
+    Description: API Gateway Invoke URL
+    Value: !Sub https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}
+  
+  ApiKeyId:
+    Description: API Key ID (not the value)
+    Value: !Ref ApiKey
