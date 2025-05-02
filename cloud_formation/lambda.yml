@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template to deploy Lambda stack
+Description: CloudFormation template to IMPORT existing Lambda stack
 
 Parameters:
   OpenSearchUsername:
@@ -27,9 +27,9 @@ Parameters:
     Default: python-dotenv
 
 Resources:
-  # Lambda function (for indexing photos)
   LF1Function:
     Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
     Properties:
       FunctionName: !Ref LF1FunctionName
       Runtime: python3.13
@@ -47,23 +47,23 @@ Resources:
           OPENSEARCH_USERNAME: !Ref OpenSearchUsername
           OPENSEARCH_PASSWORD: !Ref OpenSearchPassword
 
-  # Lambda function version
   LF1Version:
     Type: AWS::Lambda::Version
+    DeletionPolicy: Retain
     Properties:
       FunctionName: !Ref LF1Function
 
-  # Lambda function alias
   LF1Alias:
     Type: AWS::Lambda::Alias
+    DeletionPolicy: Retain
     Properties:
       FunctionName: !Ref LF1Function
       FunctionVersion: !GetAtt LF1Version.Version
       Name: prod
 
-  # Lambda function (for searching photos)
   LF2Function:
     Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
     Properties:
       FunctionName: !Ref LF2FunctionName
       Runtime: python3.13
@@ -81,23 +81,23 @@ Resources:
           OPENSEARCH_USERNAME: !Ref OpenSearchUsername
           OPENSEARCH_PASSWORD: !Ref OpenSearchPassword
 
-  # Lambda function version
   LF2Version:
     Type: AWS::Lambda::Version
+    DeletionPolicy: Retain
     Properties:
       FunctionName: !Ref LF2Function
-  
-  # Lambda function alias
+
   LF2Alias:
     Type: AWS::Lambda::Alias
+    DeletionPolicy: Retain
     Properties:
       FunctionName: !Ref LF2Function
       FunctionVersion: !GetAtt LF2Version.Version
       Name: prod
 
-  # IAM role for Lambda functions
   LambdaExecutionRole:
     Type: AWS::IAM::Role
+    DeletionPolicy: Retain
     Properties:
       RoleName: !Ref LambdaRoleName
       AssumeRolePolicyDocument:
@@ -114,10 +114,10 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonOpenSearchServiceReadOnlyAccess
         - arn:aws:iam::aws:policy/AmazonLexRunBotsOnly
         - arn:aws:iam::aws:policy/AmazonLexReadOnly
-  
-  # Layer for requests library
+
   Layer1:
     Type: AWS::Lambda::LayerVersion
+    DeletionPolicy: Retain
     Properties:
       LayerName: !Ref Layer1Name
       Description: Python requests library
@@ -127,9 +127,9 @@ Resources:
       CompatibleRuntimes:
         - python3.13
 
-  # Layer for python-dotenv library
   Layer2:
     Type: AWS::Lambda::LayerVersion
+    DeletionPolicy: Retain
     Properties:
       LayerName: !Ref Layer2Name
       Description: Python dotenv library
@@ -138,24 +138,3 @@ Resources:
         S3Key: layers/python-dotenv.zip
       CompatibleRuntimes:
         - python3.13
-
-Outputs:
-  LF1Function:
-    Description: Lambda function for indexing photos
-    Value: !Ref LF1Function
-
-  LF2Function:
-    Description: Lambda function for searching photos
-    Value: !Ref LF2Function
-
-  LambdaExecutionRole:
-    Description: IAM role for both Lambda functions
-    Value: !Ref LambdaExecutionRole
-  
-  RequestsLayer:
-    Description: Requests layer
-    Value: !Ref Layer1
-  
-  DotenvLayer:
-    Description: Python-dotenv layer
-    Value: !Ref Layer2

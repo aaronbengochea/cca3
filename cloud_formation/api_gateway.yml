@@ -1,6 +1,5 @@
-# Configurations modeled bassed on exported API Gateway swagger file provided for assignment
 AWSTemplateFormatVersion: '2010-09-09'
-Description: CloudFormation template to deploy API Gateway stack
+Description: CloudFormation template to IMPORT existing API Gateway stack
 
 Parameters:
   UploadBucketName:
@@ -29,9 +28,9 @@ Parameters:
     Default: smart-photo-album-apigateway-s3-proxy-role
 
 Resources:
-  # API Gateway REST API
   ApiGatewayRestApi:
     Type: AWS::ApiGateway::RestApi
+    DeletionPolicy: Retain
     Properties:
       Name: !Ref ApiName
       BinaryMediaTypes:
@@ -39,17 +38,17 @@ Resources:
         - image/png
         - application/octet-stream
 
-  # /search resource
   SearchResource:
     Type: AWS::ApiGateway::Resource
+    DeletionPolicy: Retain
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
       PathPart: search
-  
-  # GET /search method (Lambda proxy integration)
+
   GetSearchMethod:
     Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       ResourceId: !Ref SearchResource
@@ -63,10 +62,10 @@ Resources:
           arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${LF2FunctionName}/invocations
       MethodResponses:
         - StatusCode: 200
-  
-  # OPTIONS /search method (CORS configurations)
+
   OptionsSearchMethod:
     Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       ResourceId: !Ref SearchResource
@@ -89,17 +88,17 @@ Resources:
             method.response.header.Access-Control-Allow-Headers: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # /upload resource
   UploadResource:
     Type: AWS::ApiGateway::Resource
+    DeletionPolicy: Retain
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
       PathPart: upload
-  
-  # PUT /upload method (S3 proxy integration)
+
   PutUploadMethod:
     Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       ResourceId: !Ref UploadResource
@@ -113,8 +112,7 @@ Resources:
         Type: AWS
         IntegrationHttpMethod: PUT
         Credentials: !GetAtt S3ProxyExecutionRole.Arn
-        Uri: !Sub
-          arn:aws:apigateway:${AWS::Region}:s3:path/${UploadBucketName}/{object}
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:s3:path/${UploadBucketName}/{object}
         RequestParameters:
           integration.request.path.object: method.request.querystring.object
           integration.request.header.x-amz-meta-customLabels: method.request.header.x-amz-meta-customLabels
@@ -126,10 +124,10 @@ Resources:
         - StatusCode: 200
           ResponseParameters:
             method.response.header.Access-Control-Allow-Origin: true
-  
-  # OPTIONS /upload method (CORS configurations)
+
   OptionsUploadMethod:
     Type: AWS::ApiGateway::Method
+    DeletionPolicy: Retain
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       ResourceId: !Ref UploadResource
@@ -152,9 +150,9 @@ Resources:
             method.response.header.Access-Control-Allow-Headers: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # API Gateway deployment
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
+    DeletionPolicy: Retain
     DependsOn:
       - GetSearchMethod
       - OptionsSearchMethod
@@ -164,16 +162,16 @@ Resources:
       RestApiId: !Ref ApiGatewayRestApi
       StageName: !Ref StageName
 
-  # API key
   ApiKey:
     Type: AWS::ApiGateway::ApiKey
+    DeletionPolicy: Retain
     Properties:
       Name: !Ref ApiKeyName
       Enabled: true
 
-  # Usage plan
   UsagePlan:
     Type: AWS::ApiGateway::UsagePlan
+    DeletionPolicy: Retain
     DependsOn: ApiGatewayDeployment
     Properties:
       UsagePlanName: !Ref UsagePlanName
@@ -187,26 +185,26 @@ Resources:
         Limit: 1000
         Period: MONTH
 
-  # Usage plan key (to link API key)
   UsagePlanKey:
     Type: AWS::ApiGateway::UsagePlanKey
+    DeletionPolicy: Retain
     Properties:
       KeyId: !Ref ApiKey
       KeyType: API_KEY
       UsagePlanId: !Ref UsagePlan
 
-  # Lambda permission for GET /search (to invoke LF2-search-photos)
   LF2Permission:
     Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
     Properties:
       FunctionName: !Ref LF2FunctionName
       Action: lambda:InvokeFunction
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGatewayRestApi}/${StageName}/GET/search
-  
-  # IAM role (for S3 proxy integration)
+
   S3ProxyExecutionRole:
     Type: AWS::IAM::Role
+    DeletionPolicy: Retain
     Properties:
       RoleName: !Ref S3ProxyRoleName
       AssumeRolePolicyDocument:
@@ -218,13 +216,3 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonS3FullAccess
-
-# Outputs used in frontend/configs.js
-Outputs:
-  ApiUrl:
-    Description: API Gateway Invoke URL
-    Value: !Sub https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}
-  
-  ApiKeyId:
-    Description: API Key ID (not the value)
-    Value: !Ref ApiKey
